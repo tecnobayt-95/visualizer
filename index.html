@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--a:#ff2d95;--b:#6a3dff;--bg:#0a0618;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--bg);color:#fff;overflow:hidden;font-family:"Space Grotesk",system-ui,sans-serif}
+body.idle{cursor:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+#info{position:fixed;top:calc(3vmin + env(safe-area-inset-top,0px));left:max(3vmin,16px);display:flex;gap:14px;align-items:center;width:min(72vw,480px)}
+#cover{flex:none;width:max(8vmin,56px);height:max(8vmin,56px);border-radius:14px;background:linear-gradient(135deg,var(--a),var(--b));box-shadow:0 8px 30px -6px var(--a)}
+#meta{flex:1;min-width:0}
+#title{font-weight:700;font-size:max(2.4vmin,16px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#artist{opacity:.7;font-size:max(1.9vmin,13px);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bar{height:3px;background:rgba(255,255,255,.18);border-radius:2px;margin-top:10px;overflow:hidden}
+#bar i{display:block;height:100%;width:0;background:#fff}
+#chip{font-size:12px;opacity:.55;margin-top:8px;animation:fade 1s 6s forwards}
+@keyframes fade{to{opacity:0}}
+#hud{position:fixed;bottom:calc(3vmin + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);display:flex;gap:8px;transition:opacity .4s}
+body.idle #hud{opacity:0}
+button{font:inherit;font-size:13px;color:#fff;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(8px);white-space:nowrap}
+button:hover{background:rgba(255,255,255,.18)}
+button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#toast{position:fixed;left:50%;top:14vh;transform:translateX(-50%);background:rgba(0,0,0,.75);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw;text-align:center}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="fx"></canvas>
+<div id="info">
+  <div id="cover"></div>
+  <div id="meta"><div id="title"></div><div id="artist"></div><div id="bar"><i></i></div><div id="chip">Modo demo, sin Spotify conectado</div></div>
+</div>
+<div id="hud">
+  <button id="bSp">Conectar Spotify</button>
+  <button id="bAudio" title="Comparte el audio del sistema para que reaccione al sonido real">Audio real</button>
+  <button id="bNext" title="Siguiente canción (flecha derecha)">Siguiente</button>
+  <button id="bFs" title="Pantalla completa (F)">Pantalla completa</button>
+</div>
+<div id="toast" role="status"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// Pega tu Client ID de Spotify en CLIENT_ID (más abajo). Sin él funciona en modo demo.
+const TRACKS=[
+ {title:"Neón en la lluvia",artist:"Aurora Nocturna",dur:34,bpm:124,base:[10,6,24],c:[[255,45,149],[106,61,255]],
+  L:[[1,"Enciende la ciudad"],[4,"Que no se apague el ruido"],[7.5,"Corremos bajo el neón"],[11,"Sin mirar atrás"],[14.5,"Late fuerte"],[17,"Late más fuerte"],[20,"Somos luz en la lluvia"],[24,"Somos fuego, somos eco"],[28,"Y no pensamos parar"],[31.5,"Otra vez"]]},
+ {title:"Segunda pantalla",artist:"Modo Foco",dur:32,bpm:140,base:[4,10,26],c:[[34,230,255],[45,107,255]],
+  L:[[1,"Ronda final"],[4,"Respira hondo"],[7,"Cien por cien de concentración"],[11,"Que suene fuerte el bajo"],[14.5,"Nadie nos frena"],[18,"Subiendo de nivel"],[22,"Un último esfuerzo"],[26,"Victoria"],[29,"Siguiente partida"]]}
+];
+const $=s=>document.querySelector(s),rgb=(c,a=1)=>`rgba(${c[0]},${c[1]},${c[2]},${a})`,col=c=>new THREE.Color(`rgb(${c})`);
+const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches,K=reduce?.2:1;
+const gl=$("#gl"),fx=$("#fx"),f2=fx.getContext("2d"),PR=Math.min(devicePixelRatio||1,1.5);
+const R=new THREE.WebGLRenderer({canvas:gl}),sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(60,1,.1,3000);
+R.setPixelRatio(PR);
+const rt=new THREE.WebGLRenderTarget(4,4,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
+// Postproceso: ojo de pez, aberración cromática, destello, viñeta y grano
+const post=new THREE.ShaderMaterial({uniforms:{t:{value:null},fish:{value:0},ab:{value:0},tm:{value:0},fl:{value:0},fc:{value:new THREE.Color()},fd:{value:new THREE.Color()},gs:{value:.15}},
+ vertexShader:"varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}",
+ fragmentShader:"uniform sampler2D t;uniform float fish,ab,tm,fl;uniform vec3 fc,fd;uniform float gs;varying vec2 v;float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}void main(){vec2 q=v*2.-1.;float r=dot(q,q);vec2 s=q*(1.+fish*r)/(1.+fish*.9);vec2 d=q*ab*.012*(.3+r);vec3 c=vec3(texture2D(t,(s+d)*.5+.5).r,texture2D(t,s*.5+.5).g,texture2D(t,(s-d)*.5+.5).b);c+=fc*fl*.3;c+=mix(fc,fd,v.y*.7+v.x*.3)*gs*(1.-r*.4);c*=1.-.3*r;c+=(h(v*900.+tm)-.5)*.05;gl_FragColor=vec4(c,1.);}"});
+const ps=new THREE.Scene(),pc=new THREE.Camera(),pq=new THREE.Mesh(new THREE.PlaneGeometry(2,2),post);pq.frustumCulled=false;ps.add(pq);
+// Estrellas que dan sensación de viaje por el espacio
+const NS=900,SZ=[160,100,160],base=new Float32Array(NS*3);
+for(let i=0;i<NS*3;i++)base[i]=Math.random()*SZ[i%3];
+const sg=new THREE.BufferGeometry();sg.setAttribute("position",new THREE.BufferAttribute(new Float32Array(NS*3),3));
+const stars=new THREE.Points(sg,new THREE.PointsMaterial({size:.45,transparent:true,opacity:1,depthWrite:false}));stars.frustumCulled=false;sc.add(stars);
+function size(){const w=innerWidth,h=innerHeight;R.setSize(w,h,false);rt.setSize(w*PR,h*PR);cam.aspect=w/h;cam.updateProjectionMatrix();fx.width=w*PR;fx.height=h*PR}
+addEventListener("resize",size);size();
+
+let ti=0,start=0,last=0,TL=[],wi=-1,alive=[],cur=null,deck=[],prev=-1,an=null,data=null;const P=new THREE.Vector3();
+function nextShot(){if(!deck.length){deck=[...Array(10).keys()].sort(()=>Math.random()-.5);if(deck[deck.length-1]===prev)deck.reverse()}return prev=deck.pop()}
+function wordTex(txt,c){
+ const cn=document.createElement("canvas"),x=cn.getContext("2d"),f="400 220px Anton,Impact,sans-serif";x.font=f;
+ const w=Math.ceil(x.measureText(txt).width)+120;cn.width=w;cn.height=360;x.font=f;x.textAlign="center";x.textBaseline="middle";
+ x.shadowColor=rgb(c);x.shadowBlur=50;x.fillStyle="#fff";x.fillText(txt,w/2,185);x.fillText(txt,w/2,185);
+ const tex=new THREE.CanvasTexture(cn);tex.minFilter=THREE.LinearFilter;tex.generateMipmaps=false;return{tex,asp:w/360};
+}
+function drop(a){sc.remove(a.m);a.m.geometry.dispose();a.m.material.map.dispose();a.m.material.dispose()}
+function setTrack(i){ti=(i+TRACKS.length)%TRACKS.length;applyTrack(TRACKS[ti],false)}
+function applyTrack(T,live){
+ LIVE=live?T:null;lastPos=-99;start=performance.now();wi=-1;cur=null;if(!live)$("#cover").style.background="";
+ const s=document.documentElement.style;s.setProperty("--a",rgb(T.c[0]));s.setProperty("--b",rgb(T.c[1]));s.setProperty("--bg",rgb(T.base));
+ $("#title").textContent=T.title;$("#artist").textContent=T.artist;
+ alive.forEach(drop);alive=[];P.set(0,0,0);prev=-1;deck=[];
+ const bg=col(T.base);sc.background=bg;sc.fog=new THREE.FogExp2(bg,.02);stars.material.color=col(T.c[1]);post.uniforms.fc.value=col(T.c[0]);post.uniforms.fd.value=col(T.c[1]);
+ TL=[];T.L.forEach(([s0,txt],k)=>{
+  const e=T.L[k+1]?T.L[k+1][0]:T.dur,ws=txt.split(" "),span=Math.min((e-s0)*.85,ws.length*.8),wt=ws.map(w=>w.length+2),sum=wt.reduce((a,b)=>a+b);let c=0;
+  ws.forEach((w,j)=>{TL.push({t:s0+c/sum*span,txt:w,first:j===0});c+=wt[j]});
+ });
+}
+function spawn(i){
+ const e=TL[i],T=curT();
+ alive.forEach(a=>{if(e.first)a.kill=1;else a.tgt=.28});
+ if(e.first)P.add(new THREE.Vector3((Math.random()-.5)*10,(Math.random()-.5)*5,-26));
+ else P.add(new THREE.Vector3((Math.random()<.5?-1:1)*(5+Math.random()*4),(Math.random()-.5)*5,-(9+Math.random()*7)));
+ const{tex,asp}=wordTex(e.txt,T.c[i%2]),hg=3,wd=hg*asp;
+ const m=new THREE.Mesh(new THREE.PlaneGeometry(wd,hg),new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,opacity:0}));
+ m.position.copy(P);sc.add(m);
+ cur={m,wd,hg,tgt:1,op:0,kill:0,P:P.clone(),shot:nextShot(),t0:e.t,dur:(TL[i+1]?TL[i+1].t:T.dur)-e.t,ry:(Math.random()-.5)*.3};
+ alive.push(cur);
+}
+// 10 planos de cámara distintos, sin repetir hasta agotar la baraja
+function shot(n,p,e,d){
+ const o={x:0,y:0,z:d,roll:0,fov:60,fish:.1,sh:.1,fl:0,rx:0,rz:0,sc:1};
+ switch(n){
+ case 0:o.z=d*(3.2-2.2*e);o.fish=.15*(1-e);o.sh=.3*(1-p);break;
+ case 1:o.z=d*(.3+1.1*e);o.fish=.1+.5*(1-e);o.fl=.6*(1-p);o.sh=.15;break;
+ case 2:{const g=-.9*(1-e);o.x=Math.sin(g)*d;o.z=Math.cos(g)*d;o.y=d*.15*(1-e);o.roll=.1*(1-e);break}
+ case 3:{const g=.9*(1-e);o.x=Math.sin(g)*d;o.z=Math.cos(g)*d;o.y=-d*.2*(1-e);o.roll=-.1*(1-e);break}
+ case 4:o.z=d*(1.3-.35*e);o.roll=.45*(1-e)-.12;o.fish=.25;break;
+ case 5:o.z=d*.75;o.fov=95-35*e;o.fish=1-.55*e;o.sh=.2;break;
+ case 6:{const f=1-Math.pow(1-p,5);o.z=d*(.15+.85*f);o.fov=45+15*f;o.sh=1.1*Math.pow(1-p,2);o.fl=Math.pow(1-p,2);break}
+ case 7:o.y=d*.9*(1-e);o.z=d*(1.4-.4*e);break;
+ case 8:o.rx=1.6*(1-e);o.z=d*(2-e);o.fish=.3;break;
+ case 9:o.rz=-3.1*(1-e);o.sc=.3+.7*e;o.z=d*(1.6-.6*e);o.fish=.2;break;
+ }
+ return o;
+}
+function bin(k,t,pulse){
+ k=k<.5?k*2:(1-k)*2;
+ if(an)return Math.pow(data[Math.floor(k*70)]/255,1.3);
+ return pulse*(.5+.5*Math.sin(k*30+t*3))*(.6+.4*Math.sin(k*6-t))+.06;
+}
+function bars(pos,pulse,T){
+ const w=fx.width,h=fx.height,N=48,bw=w/N;f2.clearRect(0,0,w,h);
+ const g=f2.createLinearGradient(0,h,0,h*.8);g.addColorStop(0,rgb(T.c[0],.9));g.addColorStop(1,rgb(T.c[1],0));f2.fillStyle=g;
+ for(let i=0;i<N;i++){const bh=h*(.02+bin(i/N,pos,pulse)*.16);f2.beginPath();
+  if(f2.roundRect)f2.roundRect(i*bw+bw*.15,h-bh,bw*.7,bh+bw,bw*.35);else f2.rect(i*bw+bw*.15,h-bh,bw*.7,bh);f2.fill()}
+}
+function frame(now){
+ const T=curT(),pos=position(now),dt=Math.min(.05,(now-last)/1000);last=now;
+ if(!LIVE&&pos>T.dur){setTrack(ti+1);return requestAnimationFrame(frame)}
+ if(Math.abs(pos-lastPos)>1.2){let k=-1;TL.forEach((w,j)=>{if(w.t<=pos)k=j});wi=Math.max(-1,k-1);alive.forEach(a=>a.kill=1)}
+ lastPos=pos;
+ while(wi+1<TL.length&&pos>=TL[wi+1].t){wi++;spawn(wi)}
+ $("#bar i").style.width=(pos/T.dur*100)+"%";
+ let pulse=Math.exp(-((pos*T.bpm/60)%1)*5);
+ if(an){an.getByteFrequencyData(data);let s=0;for(let i=0;i<8;i++)s+=data[i];pulse=Math.pow(s/8/255,1.6)}
+ alive=alive.filter(a=>{a.op+=((a.kill?0:a.tgt)-a.op)*Math.min(1,dt*9);a.m.material.opacity=a.op;if(a.kill&&a.op<.02){drop(a);return false}return true});
+ let o={fish:.1,sh:.1,fl:0},amp=0;
+ if(cur){
+  const a=cur,p=Math.min(1,Math.max(0,(pos-a.t0)/Math.min(1.1,a.dur))),e=1-Math.pow(1-p,3),th=Math.tan(Math.PI/6);
+  const d=Math.max(a.wd/(.8*2*th*cam.aspect),a.hg/(.45*2*th));
+  o=shot(a.shot,p,e,d);amp=Math.max(o.sh,pulse*.12)*K;
+  const nx=(Math.sin(now*.047)+Math.sin(now*.083+2))*.5,ny=(Math.sin(now*.053+1)+Math.sin(now*.071+4))*.5,u=d*.03*amp;
+  a.m.rotation.set(o.rx,a.ry*(1-e),o.rz);a.m.scale.setScalar(o.sc);
+  cam.position.set(a.P.x+o.x+nx*u,a.P.y+o.y+ny*u,a.P.z+o.z);cam.lookAt(a.P);cam.rotateZ(o.roll*K+nx*amp*.02);
+  cam.fov=o.fov+pulse*3*K;cam.updateProjectionMatrix();
+ }
+ const cp=[cam.position.x,cam.position.y,cam.position.z],sp=sg.attributes.position.array;
+ for(let i=0;i<NS;i++)for(let a=0;a<3;a++){const S=SZ[a];let v=base[i*3+a]-cp[a];v=((v%S)+S)%S-S/2;sp[i*3+a]=cp[a]+v}
+ sg.attributes.position.needsUpdate=true;
+ const U=post.uniforms;U.fish.value=Math.min(1,(o.fish+pulse*.1)*(reduce?.3:1));U.ab.value=.4+amp*2.5+pulse*.6;U.fl.value=(o.fl*.8+pulse*.1)*K;U.tm.value=(now%1000)/1000;U.gs.value=.15+pulse*.15;
+ R.setRenderTarget(rt);R.render(sc,cam);R.setRenderTarget(null);U.t.value=rt.texture;R.render(ps,pc);
+ bars(pos,pulse,T);
+ requestAnimationFrame(frame);
+}
+function toast(m){const t=$("#toast");t.textContent=m;t.style.opacity=1;setTimeout(()=>t.style.opacity=0,3500)}
+$("#bAudio").onclick=async()=>{
+ try{
+  const s=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+  if(!s.getAudioTracks().length){s.getTracks().forEach(t=>t.stop());return toast("No se compartió audio. Marca «Compartir audio» al elegir la pestaña o pantalla.")}
+  const ac=new AudioContext(),src=ac.createMediaStreamSource(s);an=ac.createAnalyser();an.fftSize=512;an.smoothingTimeConstant=.78;
+  src.connect(an);data=new Uint8Array(an.frequencyBinCount);toast("Reaccionando al audio real");
+ }catch(e){toast("El navegador bloqueó la captura de audio. Se mantiene el ritmo simulado.")}
+};
+const fs=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(()=>toast("Pantalla completa no disponible aquí. Abre la página en su propia pestaña."));
+$("#bFs").onclick=fs;$("#bNext").onclick=()=>{if(!SPOT)setTrack(ti+1)};
+addEventListener("keydown",e=>{if(e.key==="f"||e.key==="F")fs();if(e.key==="ArrowRight"&&!SPOT)setTrack(ti+1)});
+let idle;const wake=()=>{document.body.classList.remove("idle");clearTimeout(idle);idle=setTimeout(()=>document.body.classList.add("idle"),3000)};
+["mousemove","keydown","pointerdown"].forEach(e=>addEventListener(e,wake));wake();
+// ---------- Spotify (PKCE, sin secreto) + letras de LRCLIB ----------
+const CLIENT_ID="PEGA_AQUI_TU_CLIENT_ID",REDIR=location.origin+location.pathname.replace(/index\.html$/,""),SCOPE="user-read-currently-playing user-read-playback-state";
+let LIVE=null,lastPos=0,SPOT=false;const sp={tok:null,ref:null,exp:0,prog:0,at:0,playing:false,id:null};
+const curT=()=>LIVE||TRACKS[ti];
+const position=now=>LIVE?sp.prog+(sp.playing?(now-sp.at)/1000:0):(now-start)/1000;
+const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+async function login(){
+ if(CLIENT_ID.startsWith("PEGA"))return toast("Falta pegar tu Client ID de Spotify en el código (CLIENT_ID).");
+ const v=b64(crypto.getRandomValues(new Uint8Array(48)));localStorage.setItem("spv",v);
+ const ch=b64(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v)));
+ location.href="https://accounts.spotify.com/authorize?"+new URLSearchParams({client_id:CLIENT_ID,response_type:"code",redirect_uri:REDIR,scope:SCOPE,code_challenge_method:"S256",code_challenge:ch});
+}
+async function tokenReq(body){
+ const r=await fetch("https://accounts.spotify.com/api/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:CLIENT_ID,...body})});
+ if(!r.ok)throw new Error("token");const j=await r.json();
+ sp.tok=j.access_token;sp.exp=Date.now()+j.expires_in*1000-60000;if(j.refresh_token)sp.ref=j.refresh_token;
+ localStorage.setItem("spt",JSON.stringify({ref:sp.ref}));
+}
+async function auth(){
+ const q=new URLSearchParams(location.search);
+ if(q.get("error")){history.replaceState({},"",REDIR);toast("Spotify no autorizó la conexión.");return false}
+ if(q.get("code")){history.replaceState({},"",REDIR);
+  try{await tokenReq({grant_type:"authorization_code",code:q.get("code"),redirect_uri:REDIR,code_verifier:localStorage.getItem("spv")});return true}
+  catch(e){toast("No se pudo conectar con Spotify. Revisa el Client ID y la Redirect URI.");return false}}
+ try{const s=JSON.parse(localStorage.getItem("spt")||"null");if(s&&s.ref){sp.ref=s.ref;await tokenReq({grant_type:"refresh_token",refresh_token:s.ref});return true}}catch(e){}
+ return false;
+}
+const hsl=(h,s,l)=>{const a=s*Math.min(l,1-l),f=n=>{const k=(n+h/30)%12;return Math.round(255*(l-a*Math.max(-1,Math.min(k-3,9-k,1))))};return[f(0),f(8),f(4)]};
+function palette(url,id){return new Promise(res=>{
+ const fall=()=>{let h=0;for(const ch of id)h=(h*31+ch.charCodeAt(0))%360;return{c:[hsl(h,.9,.55),hsl((h+50)%360,.9,.55)],base:hsl(h,.5,.05)}};
+ if(!url)return res(fall());
+ const im=new Image();im.crossOrigin="anonymous";
+ im.onload=()=>{try{
+  const c=document.createElement("canvas");c.width=c.height=24;const x=c.getContext("2d");x.drawImage(im,0,0,24,24);
+  const d=x.getImageData(0,0,24,24).data,px=[];
+  for(let i=0;i<d.length;i+=4){const mx=Math.max(d[i],d[i+1],d[i+2]),mn=Math.min(d[i],d[i+1],d[i+2]);px.push({c:[d[i],d[i+1],d[i+2]],s:(mx-mn)*(mx/255)})}
+  px.sort((a,b)=>b.s-a.s);
+  const c1=px[0].c,dist=(a,b)=>Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1])+Math.abs(a[2]-b[2]);
+  const c2=(px.find(p=>dist(p.c,c1)>150)||px[Math.floor(px.length/3)]).c;
+  const lift=c=>{const m=Math.max(...c)||1,k=Math.min(1.6,230/m);return c.map(v=>Math.min(255,Math.round(v*k)))};
+  res({c:[lift(c1),lift(c2)],base:c2.map(v=>Math.round(v*.1)+4)});
+ }catch(e){res(fall())}};
+ im.onerror=()=>res(fall());im.src=url;
+})}
+async function lyrics(it,art){
+ const parse=s=>s.split("\n").map(l=>{const m=l.match(/^\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)$/);return m&&m[3].trim()?[+m[1]*60+ +m[2],m[3].trim()]:null}).filter(Boolean);
+ try{
+  const q=new URLSearchParams({track_name:it.name,artist_name:it.artists[0].name,album_name:it.album.name,duration:Math.round(it.duration_ms/1000)});
+  const r=await fetch("https://lrclib.net/api/get?"+q);let j=r.ok?await r.json():null;
+  if(!j||!j.syncedLyrics){const s=await fetch("https://lrclib.net/api/search?"+new URLSearchParams({track_name:it.name,artist_name:it.artists[0].name}));const a=s.ok?await s.json():[];j=a.find(x=>x.syncedLyrics)||null}
+  if(j&&j.syncedLyrics){const L=parse(j.syncedLyrics);if(L.length)return L}
+ }catch(e){toast("No se pudo cargar la letra (LRCLIB no responde o el navegador la bloquea).");return[[.6,it.name],[4,art]]}
+ toast("Sin letra sincronizada para esta canción");
+ return[[.6,it.name],[4,art]];
+}
+async function newTrack(it){
+ const art=it.artists.map(a=>a.name).join(", "),img=(it.album.images[1]||it.album.images[0]||{}).url;
+ const T={title:it.name,artist:art,dur:it.duration_ms/1000,bpm:110,base:[10,6,24],c:[[255,45,149],[106,61,255]],L:[]};
+ const[pal,L]=await Promise.all([palette(img,it.id),lyrics(it,art)]);
+ if(sp.id!==it.id)return;
+ Object.assign(T,pal,{L});applyTrack(T,true);
+ if(img)$("#cover").style.background=`center/cover url(${img})`;
+}
+function idleTrack(){
+ if(LIVE&&LIVE.idle)return;sp.id=null;
+ applyTrack({idle:1,title:"Esperando a Spotify",artist:"Reproduce algo en tu cuenta",dur:1e9,bpm:100,base:[10,8,20],c:[[255,45,149],[106,61,255]],L:[]},true);
+}
+let warned=false;
+async function poll(){
+ let wait=5000;
+ try{
+  if(Date.now()>sp.exp)await tokenReq({grant_type:"refresh_token",refresh_token:sp.ref});
+  const r=await fetch("https://api.spotify.com/v1/me/player/currently-playing",{headers:{Authorization:"Bearer "+sp.tok}});
+  if(r.status===429)wait=(+r.headers.get("Retry-After")||10)*1000;
+  else if(r.status===204){sp.playing=false;idleTrack()}
+  else if(r.status===401)sp.exp=0;
+  else if(r.status===403){if(!warned){warned=true;toast("Spotify no deja entrar con esta cuenta. Añádela en User management del panel de tu app (máximo 5 usuarios).")}wait=10000}
+  else if(r.ok){
+   const j=await r.json();
+   if(j.item&&j.currently_playing_type==="track"){
+    sp.prog=j.progress_ms/1000;sp.at=performance.now();sp.playing=j.is_playing;
+    if(j.item.id!==sp.id){sp.id=j.item.id;await newTrack(j.item)}
+    if(sp.playing&&LIVE&&!LIVE.idle)wait=Math.min(5000,Math.max(1200,(LIVE.dur-position(performance.now()))*1000+600));
+   }
+  }
+ }catch(e){if(e.message==="token"){localStorage.removeItem("spt");toast("La sesión de Spotify caducó. Recarga la página y pulsa Conectar Spotify.");return}}
+ setTimeout(poll,wait);
+}
+$("#bSp").onclick=login;
+async function bootSpotify(){
+ if(!await auth())return false;
+ SPOT=true;$("#bSp").hidden=true;$("#bNext").hidden=true;$("#chip").textContent="";idleTrack();poll();return true;
+}
+// Espera a que cargue la tipografía para dibujar las palabras con ella
+Promise.race([document.fonts.load("220px Anton"),new Promise(r=>setTimeout(r,2500))]).catch(()=>{}).then(async()=>{last=performance.now();if(!await bootSpotify())setTrack(0);requestAnimationFrame(frame)});
+</script>
+</body>
+</html>
