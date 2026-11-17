@@ -40,6 +40,8 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 </div>
 <div id="hud">
   <button id="bSp">Conectar Spotify</button>
+  <button id="bDel" hidden title="Si la letra va por delante (flecha abajo)">Retrasar letra</button>
+  <button id="bAdv" hidden title="Si la letra va por detrás (flecha arriba)">Adelantar letra</button>
   <button id="bAudio" title="Comparte el audio del sistema para que reaccione al sonido real">Audio real</button>
   <button id="bNext" title="Siguiente canción (flecha derecha)">Siguiente</button>
   <button id="bFs" title="Pantalla completa (F)">Pantalla completa</button>
@@ -172,17 +174,17 @@ $("#bAudio").onclick=async()=>{
 };
 const fs=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(()=>toast("Pantalla completa no disponible aquí. Abre la página en su propia pestaña."));
 $("#bFs").onclick=fs;$("#bNext").onclick=()=>{if(!SPOT)setTrack(ti+1)};
-addEventListener("keydown",e=>{if(e.key==="f"||e.key==="F")fs();if(e.key==="ArrowRight"&&!SPOT)setTrack(ti+1)});
+addEventListener("keydown",e=>{if(e.key==="f"||e.key==="F")fs();if(e.key==="ArrowRight"&&!SPOT)setTrack(ti+1);if(SPOT&&e.key==="ArrowDown")setOff(OFF+.25);if(SPOT&&e.key==="ArrowUp")setOff(OFF-.25)});
 let idle;const wake=()=>{document.body.classList.remove("idle");clearTimeout(idle);idle=setTimeout(()=>document.body.classList.add("idle"),3000)};
 ["mousemove","keydown","pointerdown"].forEach(e=>addEventListener(e,wake));wake();
 // ---------- Spotify (PKCE, sin secreto) + letras de LRCLIB ----------
-const CLIENT_ID="538199ae87d347a292cf4dd71c12d11d",REDIR=location.origin+location.pathname.replace(/index\.html$/,""),SCOPE="user-read-currently-playing user-read-playback-state";
-let LIVE=null,lastPos=0,SPOT=false;const sp={tok:null,ref:null,exp:0,prog:0,at:0,playing:false,id:null};
+let CLIENT_ID=localStorage.getItem("spcid")||"538199ae87d347a292cf4dd71c12d11d",REDIR=location.origin+location.pathname.replace(/index\.html$/,""),SCOPE="user-read-currently-playing user-read-playback-state";
+let LIVE=null,lastPos=0,SPOT=false,OFF=0;const sp={tok:null,ref:null,exp:0,prog:0,at:0,playing:false,id:null};
 const curT=()=>LIVE||TRACKS[ti];
-const position=now=>LIVE?sp.prog+(sp.playing?(now-sp.at)/1000:0):(now-start)/1000;
+const position=now=>LIVE?sp.prog-OFF+(sp.playing?(now-sp.at)/1000:0):(now-start)/1000;
 const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 async function login(){
- if(CLIENT_ID.startsWith("PEGA"))return toast("Falta pegar tu Client ID de Spotify en el código (CLIENT_ID).");
+ if(CLIENT_ID.startsWith("PEGA")){const id=prompt("Pega tu Client ID de Spotify (este navegador lo recordará):");if(!id||!id.trim())return;CLIENT_ID=id.trim();localStorage.setItem("spcid",CLIENT_ID)}
  const v=b64(crypto.getRandomValues(new Uint8Array(48)));localStorage.setItem("spv",v);
  const ch=b64(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v)));
  location.href="https://accounts.spotify.com/authorize?"+new URLSearchParams({client_id:CLIENT_ID,response_type:"code",redirect_uri:REDIR,scope:SCOPE,code_challenge_method:"S256",code_challenge:ch});
@@ -199,6 +201,7 @@ async function auth(){
  if(q.get("code")){history.replaceState({},"",REDIR);
   try{await tokenReq({grant_type:"authorization_code",code:q.get("code"),redirect_uri:REDIR,code_verifier:localStorage.getItem("spv")});return true}
   catch(e){toast("No se pudo conectar con Spotify. Revisa el Client ID y la Redirect URI.");return false}}
+ if(CLIENT_ID.startsWith("PEGA"))return false;
  try{const s=JSON.parse(localStorage.getItem("spt")||"null");if(s&&s.ref){sp.ref=s.ref;await tokenReq({grant_type:"refresh_token",refresh_token:s.ref});return true}}catch(e){}
  return false;
 }
@@ -224,13 +227,14 @@ async function lyrics(it,art){
  try{
   const q=new URLSearchParams({track_name:it.name,artist_name:it.artists[0].name,album_name:it.album.name,duration:Math.round(it.duration_ms/1000)});
   const r=await fetch("https://lrclib.net/api/get?"+q);let j=r.ok?await r.json():null;
-  if(!j||!j.syncedLyrics){const s=await fetch("https://lrclib.net/api/search?"+new URLSearchParams({track_name:it.name,artist_name:it.artists[0].name}));const a=s.ok?await s.json():[];j=a.find(x=>x.syncedLyrics)||null}
+  if(!j||!j.syncedLyrics){const s=await fetch("https://lrclib.net/api/search?"+new URLSearchParams({track_name:it.name,artist_name:it.artists[0].name}));const a=s.ok?await s.json():[];const d=it.duration_ms/1000;j=a.filter(x=>x.syncedLyrics&&Math.abs(x.duration-d)<=5).sort((p,q)=>Math.abs(p.duration-d)-Math.abs(q.duration-d))[0]||null}
   if(j&&j.syncedLyrics){const L=parse(j.syncedLyrics);if(L.length)return L}
  }catch(e){toast("No se pudo cargar la letra (LRCLIB no responde o el navegador la bloquea).");return[[.6,it.name],[4,art]]}
  toast("Sin letra sincronizada para esta canción");
  return[[.6,it.name],[4,art]];
 }
 async function newTrack(it){
+ OFF=+(localStorage.getItem("off_"+it.id)??localStorage.getItem("off_g")??0);
  const art=it.artists.map(a=>a.name).join(", "),img=(it.album.images[1]||it.album.images[0]||{}).url;
  const T={title:it.name,artist:art,dur:it.duration_ms/1000,bpm:110,base:[10,6,24],c:[[255,45,149],[106,61,255]],L:[]};
  const[pal,L]=await Promise.all([palette(img,it.id),lyrics(it,art)]);
@@ -257,16 +261,18 @@ async function poll(){
    if(j.item&&j.currently_playing_type==="track"){
     sp.prog=j.progress_ms/1000;sp.at=performance.now();sp.playing=j.is_playing;
     if(j.item.id!==sp.id){sp.id=j.item.id;await newTrack(j.item)}
-    if(sp.playing&&LIVE&&!LIVE.idle)wait=Math.min(5000,Math.max(1200,(LIVE.dur-position(performance.now()))*1000+600));
+    if(sp.playing&&LIVE&&!LIVE.idle)wait=Math.min(5000,Math.max(1200,(LIVE.dur-(sp.prog+(performance.now()-sp.at)/1000))*1000+600));
    }
   }
  }catch(e){if(e.message==="token"){localStorage.removeItem("spt");toast("La sesión de Spotify caducó. Recarga la página y pulsa Conectar Spotify.");return}}
  setTimeout(poll,wait);
 }
+function setOff(v){OFF=Math.round(v*100)/100;if(sp.id)localStorage.setItem("off_"+sp.id,OFF);localStorage.setItem("off_g",OFF);toast(OFF===0?"Letra sin ajuste":`Letra ${OFF>0?"retrasada":"adelantada"} ${Math.abs(OFF).toFixed(2)} s`)}
+$("#bDel").onclick=()=>setOff(OFF+.5);$("#bAdv").onclick=()=>setOff(OFF-.5);
 $("#bSp").onclick=login;
 async function bootSpotify(){
  if(!await auth())return false;
- SPOT=true;$("#bSp").hidden=true;$("#bNext").hidden=true;$("#chip").textContent="";idleTrack();poll();return true;
+ SPOT=true;$("#bSp").hidden=true;$("#bNext").hidden=true;$("#bDel").hidden=$("#bAdv").hidden=false;$("#chip").textContent="";idleTrack();poll();return true;
 }
 // Espera a que cargue la tipografía para dibujar las palabras con ella
 Promise.race([document.fonts.load("220px Anton"),new Promise(r=>setTimeout(r,2500))]).catch(()=>{}).then(async()=>{last=performance.now();if(!await bootSpotify())setTrack(0);requestAnimationFrame(frame)});
