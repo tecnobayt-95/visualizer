@@ -176,7 +176,7 @@ addEventListener("keydown",e=>{if(e.key==="f"||e.key==="F")fs();if(e.key==="Arro
 let idle;const wake=()=>{document.body.classList.remove("idle");clearTimeout(idle);idle=setTimeout(()=>document.body.classList.add("idle"),3000)};
 ["mousemove","keydown","pointerdown"].forEach(e=>addEventListener(e,wake));wake();
 // ---------- Spotify (PKCE, sin secreto) + letras de LRCLIB ----------
-const CLIENT_ID="PEGA_AQUI_TU_CLIENT_ID",REDIR=location.origin+location.pathname.replace(/index\.html$/,""),SCOPE="user-read-currently-playing user-read-playback-state";
+const CLIENT_ID="538199ae87d347a292cf4dd71c12d11d",REDIR=location.origin+location.pathname.replace(/index\.html$/,""),SCOPE="user-read-currently-playing user-read-playback-state";
 let LIVE=null,lastPos=0,SPOT=false;const sp={tok:null,ref:null,exp:0,prog:0,at:0,playing:false,id:null};
 const curT=()=>LIVE||TRACKS[ti];
 const position=now=>LIVE?sp.prog+(sp.playing?(now-sp.at)/1000:0):(now-start)/1000;
