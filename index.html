@@ -76,6 +76,8 @@ input[type=range]{width:100%;accent-color:var(--v)}
 #pop{position:fixed;right:5vmin;top:22vh;font:400 clamp(28px,7vmin,90px)/1 "Lilita One",Anton,Impact,sans-serif;color:#fff;-webkit-text-stroke:.07em #1a0033;paint-order:stroke fill;text-shadow:0 .06em 0 #1a0033;opacity:0;pointer-events:none}
 #pop.go{animation:pop 1.4s cubic-bezier(.2,1.6,.3,1) forwards}
 @keyframes pop{0%{opacity:0;transform:scale(.3) rotate(-14deg)}20%{opacity:1;transform:scale(1.15) rotate(-6deg)}70%{opacity:1;transform:scale(1) rotate(-6deg)}100%{opacity:0;transform:scale(1.1) translateY(-4vh) rotate(-6deg)}}
+#cAuto{display:grid;place-items:center}
+#cAuto::after{content:"♪";font-size:14px;color:#fff;text-shadow:0 0 3px #000}
 @media (prefers-reduced-motion:reduce){#drawer,.ui{transition:none}#pop.go{animation:none}}
 </style>
 </head>
@@ -195,7 +197,7 @@ function bars(pos,pulse,T){
  const w=fx.width,h=fx.height,dn=S.style==="dance",N=dn?48:96,bw=w/N,base=dn?h:h*.88,mx=dn?.09:.26,hs=[];f2.clearRect(0,0,w,h);
  const rr=(x,y,ww,hh,r)=>{if(f2.roundRect)f2.roundRect(x,y,ww,hh,r);else f2.rect(x,y,ww,hh)};
  const g=f2.createLinearGradient(0,0,w,0);
- if(dn){g.addColorStop(0,"rgba(255,255,255,.7)");g.addColorStop(1,"rgba(255,255,255,.7)")}else{g.addColorStop(0,rgb(T.c[0]));g.addColorStop(.5,"rgb(123,60,255)");g.addColorStop(1,rgb(T.c[1]))}
+ if(dn){g.addColorStop(0,"rgba(255,255,255,.7)");g.addColorStop(1,"rgba(255,255,255,.7)")}else{g.addColorStop(0,rgb(T.c[0]));g.addColorStop(.5,rgb(mixc(T.c[0],T.c[1])));g.addColorStop(1,rgb(T.c[1]))}
  f2.fillStyle=g;
  for(let i=0;i<N;i++){const v=dn?bin(i/N,pos,pulse):bin2(i/N,pos,pulse),bh=h*(.012+v*mx*I.s);hs.push(bh);f2.beginPath();rr(i*bw+bw*.18,base-bh,bw*.64,bh,bw*.3);f2.fill()}
  if(!dn){f2.save();f2.globalAlpha=.16;for(let i=0;i<N;i++){f2.beginPath();rr(i*bw+bw*.18,base+5,bw*.64,hs[i]*.45,bw*.3);f2.fill()}f2.restore()}
@@ -262,7 +264,7 @@ function beatDetect(tt,p){
 }
 // ---------- Estilo Neón (BeatViz): haces, niebla, suelo, anillo y silueta ----------
 const POSES2=[...POSES,[-.6,-1,2.7,2.85,-.5,-.15,.55,.12,-.1],[-1.2,-1,1.2,1,-.6,-.25,.6,.25,0],[-2.9,-3,-.4,.6,-.35,-.1,.3,.5,.12],[-.8,1.6,.8,-1.6,-.4,-.1,.4,.1,0],[-1.57,-3,1.57,3,-.15,-.05,.15,.05,0]];
-const bin2=(k,t,p)=>an?Math.pow(Math.min(1,data[1+Math.floor(k*k*110)]/255/pk),1.3):p*(.45+.4*Math.sin(k*24+t*3))*(.5+.5*Math.sin(k*5-t*.7))+.05+.03*Math.sin(k*60+t*5);
+const bin2=(k,t,p)=>an?Math.pow(Math.min(1,data[1+Math.floor(k*k*110)]/255/pk*(.55+.9*k)),1.6):p*(.45+.4*Math.sin(k*24+t*3))*(.5+.5*Math.sin(k*5-t*.7))+.05+.03*Math.sin(k*60+t*5);
 const mir=q=>[-q[2],-q[3],-q[0],-q[1],-q[6],-q[7],-q[4],-q[5],-q[8]],sway=(q,bt)=>{q=q.slice();q[8]+=.07*Math.sin(bt*Math.PI);return q};
 function silPath(x,fy,H,bt){
  const n=POSES2.length,u=bt/2,c=Math.floor(u),e=ease(Math.min(1,(u-c)/.4)),A=POSES2[((c-1)%n+n)%n],C=POSES2[(c%n+n)%n],Q1=A.map((a,k)=>a+(C[k]-a)*e),Q=sway(Math.floor(u/4)%2?mir(Q1):Q1,bt);
@@ -289,11 +291,12 @@ function neon(path,x,H,pulse,c1,c2,al,glow){
  else b2.stroke(path);
  b2.globalAlpha=Math.min(1,al*(glow?1.6:4));b2.fillStyle="#04010f";b2.fill(path);b2.restore();
 }
+const mixc=(a,b)=>a.map((v,i)=>(v+b[i])>>1);
 let bk="",bcv=null;
 function beams(w,h,fy,c1,c2){
  const k=w+"|"+h+"|"+c1+"|"+c2;if(k===bk)return bcv;bk=k;bcv=bcv||document.createElement("canvas");bcv.width=w;bcv.height=h;
  const x=bcv.getContext("2d");x.filter="blur("+Math.round(h*.012)+"px)";
- for(let i=0;i<7;i++){const c=i<2?c1:i<4?[123,60,255]:c2,bw=w*.11,x0=w*(.04+i*.15),sk=(i%2?-1:1)*w*.12,g=x.createLinearGradient(0,0,0,fy);
+ for(let i=0;i<7;i++){const c=i<2?c1:i<4?mixc(c1,c2):c2,bw=w*.11,x0=w*(.04+i*.15),sk=(i%2?-1:1)*w*.12,g=x.createLinearGradient(0,0,0,fy);
   g.addColorStop(0,rgb(c,0));g.addColorStop(1,rgb(c,.55));x.fillStyle=g;x.beginPath();x.moveTo(x0,0);x.lineTo(x0+bw,0);x.lineTo(x0+bw+sk,fy);x.lineTo(x0+sk,fy);x.fill()}
  return bcv;
 }
@@ -303,7 +306,7 @@ function paintNeon(t,pulse,T){
  if(S.style==="neon"){
   b2.globalCompositeOperation="lighter";
   b2.globalAlpha=Math.min(1,(.45+pulse*.5)*Lg);b2.drawImage(beams(w,h,fy,c1,c2),Math.sin(t*.4)*w*.01,0);b2.globalAlpha=1;
-  for(const[fq,c]of[[.2,c1],[.52,[123,60,255]],[.82,c2]]){g=b2.createRadialGradient(w*fq,fy,0,w*fq,fy,w*.28);g.addColorStop(0,rgb(c,.5*Lg));g.addColorStop(1,rgb(c,0));b2.fillStyle=g;b2.fillRect(0,fy-h*.3,w,h*.4)}
+  for(const[fq,c]of[[.2,c1],[.52,mixc(c1,c2)],[.82,c2]]){g=b2.createRadialGradient(w*fq,fy,0,w*fq,fy,w*.28);g.addColorStop(0,rgb(c,.5*Lg));g.addColorStop(1,rgb(c,0));b2.fillStyle=g;b2.fillRect(0,fy-h*.3,w,h*.4)}
   b2.globalCompositeOperation="source-over";
  }
  g=b2.createLinearGradient(0,fy,0,h);g.addColorStop(0,"rgba(22,8,64,.96)");g.addColorStop(1,"rgba(4,2,20,1)");b2.fillStyle=g;b2.fillRect(0,fy,w,h-fy);
@@ -489,9 +492,9 @@ function save(){localStorage.setItem("bvs",JSON.stringify(S));syncI()}syncI();
 function applyPal(T){
  T.c0=T.c0||T.c;T.c=S.pal==="auto"?T.c0:S.pal==="custom"&&S.custom?S.custom:(PALS[+S.pal]||PALS[0]).c;
  const r=document.documentElement.style;r.setProperty("--a",rgb(T.c[0]));r.setProperty("--b",rgb(T.c[1]));
- post.uniforms.fc.value=col(T.c[0]);post.uniforms.fd.value=col(T.c[1]);T.dc=[0,90,180,270].map(k=>hsl((hue(T.c[0])+k)%360,.95,.58));
+ post.uniforms.fc.value=col(T.c[0]);post.uniforms.fd.value=col(T.c[1]);const ca=$("#cAuto");if(ca)ca.style.background=`linear-gradient(135deg,${rgb(T.c0[0])},${rgb(T.c0[1])})`;T.dc=[0,90,180,270].map(k=>hsl((hue(T.c[0])+k)%360,.95,.58));
 }
-$("#pal").innerHTML=PALS.map((p,i)=>`<button data-pal="${i}" aria-label="Paleta ${i+1}" style="background:linear-gradient(135deg,${rgb(p.c[0])},${rgb(p.c[1])})"></button>`).join("")+`<button id="bAddC" aria-label="Color personalizado">+</button>`;
+$("#pal").innerHTML='<button data-pal="auto" id="cAuto" aria-label="Colores de la canción" title="Colores de la canción"></button>'+PALS.map((p,i)=>`<button data-pal="${i}" aria-label="Paleta ${i+1}" style="background:linear-gradient(135deg,${rgb(p.c[0])},${rgb(p.c[1])})"></button>`).join("")+`<button id="bAddC" aria-label="Color personalizado">+</button>`;
 $("#drawer").innerHTML=`<h3>Ajustes</h3>
 <div class="row"><label>Estilo</label><div class="seg" id="sStyle"><button data-k="neon">Neón</button><button data-k="dance">Just Dance</button><button data-k="min">Minimal</button></div></div>
 <div class="row"><label>Colores</label><div class="seg"><button data-pal="auto">Portada</button>${PALS.map((p,i)=>`<button data-pal="${i}" aria-label="Paleta ${i+1}" style="background:linear-gradient(135deg,${rgb(p.c[0])},${rgb(p.c[1])})">&nbsp;</button>`).join("")}</div></div>
@@ -520,7 +523,7 @@ $("#drawer").onclick=e=>{const b=e.target.closest("button");if(!b)return;
  else if(b.id==="bOut"){if(SPOT)logout();else toast("No hay ninguna cuenta conectada.")}
  save();mark()};
 $("#drawer").oninput=e=>{const t=e.target;if(t.dataset.i)S.int[t.dataset.i]=+t.value;else if(t.id==="cLy")S.ly=t.checked;save();mark()};
-$("#pal").onclick=e=>{const b=e.target.closest("button");if(!b)return;if(b.id==="bAddC")return $("#cpk").click();S.pal=+b.dataset.pal;applyPal(curT());save();mark()};
+$("#pal").onclick=e=>{const b=e.target.closest("button");if(!b)return;if(b.id==="bAddC")return $("#cpk").click();S.pal=b.dataset.pal==="auto"?"auto":+b.dataset.pal;applyPal(curT());save();mark()};
 $("#cpk").oninput=e=>{const h=e.target.value,c=[1,3,5].map(i=>parseInt(h.substr(i,2),16));S.custom=[c,hsl((hue(c)+150)%360,.9,.55)];S.pal="custom";applyPal(curT());save();mark()};
 document.querySelectorAll(".nv").forEach(b=>b.onclick=()=>{const p=b.dataset.p;document.querySelectorAll(".nv").forEach(x=>x.classList.toggle("on",x===b));$("#drawer").classList.toggle("on",p==="set");$("#about").hidden=p!=="about"});
 $("#chev").onclick=()=>document.body.classList.toggle("hide");
