@@ -16,19 +16,19 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 html,body{height:100%;background:var(--bg);color:#fff;overflow:hidden;font-family:"Space Grotesk",system-ui,sans-serif}
 body.idle{cursor:none}
 canvas{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
-:root{--v:#7b3cff;--pan:rgba(14,10,45,.72);--bd:rgba(150,120,255,.28)}
+:root{--v:#7b3cff;--pan:rgba(14,10,45,.72);--bd:rgba(150,120,255,.28);--pani:#0e0a2d}
 .vh{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
 .ui{transition:opacity .4s}
 body.fsm.idle .ui,body.hide .ui{opacity:0;pointer-events:none}
 button{font:inherit;font-size:14px;color:#fff;background:rgba(255,255,255,.06);border:1px solid var(--bd);border-radius:12px;padding:8px 14px;cursor:pointer;white-space:nowrap}
 button:hover{background:rgba(255,255,255,.14)}
 button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:2px}
-#top{position:fixed;inset:0 0 auto 0;height:64px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(#05031add,#05031a00);z-index:5}
+#top{position:fixed;inset:0 0 auto 0;height:64px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,0));z-index:5}
 #logo{display:flex;align-items:center;gap:10px;font:700 26px/1 "Space Grotesk",sans-serif}
 #logo i{font-style:normal;background:linear-gradient(90deg,var(--v),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
 nav{display:flex;gap:6px}
 .nv{background:none;border-color:transparent;border-radius:999px;padding:9px 20px;font-size:15px}
-.nv.on{border-color:var(--v);background:rgba(123,60,255,.28)}
+.nv.on{border-color:var(--v);background:color-mix(in srgb,var(--v) 30%,transparent)}
 #conn{display:flex;align-items:center;gap:10px;border-radius:999px;padding:8px 16px;background:var(--pan)}
 #dot{width:9px;height:9px;border-radius:50%;background:#777}
 #conn.on #dot{background:#1ed760;box-shadow:0 0 8px #1ed760}
@@ -48,7 +48,7 @@ nav{display:flex;gap:6px}
 #ctl button.on{color:var(--a);opacity:1}
 #ctl button.r1{position:relative}
 #ctl button.r1::after{content:"1";position:absolute;font-size:9px;font-weight:700;right:6px;top:7px}
-#ctl #bPl{width:66px;height:66px;opacity:1;border:2px solid transparent;background:linear-gradient(#0e0a2d,#0e0a2d) padding-box,linear-gradient(135deg,var(--a),var(--v)) border-box}
+#ctl #bPl{width:66px;height:66px;opacity:1;border:2px solid transparent;background:linear-gradient(var(--pani),var(--pani)) padding-box,linear-gradient(135deg,var(--a),var(--v)) border-box}
 body.dis #ctl button{opacity:.35}
 #stat{right:2.2vw;top:27vh;padding:16px 22px;display:flex;gap:14px;align-items:center;cursor:pointer}
 #stat b{display:block;font-size:16px}
@@ -67,13 +67,13 @@ body.hide #chev{transform:translateX(-50%) rotate(180deg)}
 .row>label{display:flex;justify-content:space-between;align-items:center;font-size:13px;opacity:.85;margin-bottom:6px}
 .seg{display:flex;gap:6px;flex-wrap:wrap}
 .seg button{flex:1;min-height:34px}
-.seg button.on{border-color:var(--v);background:rgba(123,60,255,.35)}
+.seg button.on{border-color:var(--v);background:color-mix(in srgb,var(--v) 38%,transparent)}
 input[type=range]{width:100%;accent-color:var(--v)}
 #about{left:50%;top:50%;transform:translate(-50%,-50%);width:min(480px,90vw);padding:22px;z-index:7}
 #about ul{margin:10px 0 0 18px;font-size:14px;line-height:1.6}
 @media (max-width:760px){#top{padding:0 12px}#logo{font-size:20px}.nv{padding:7px 10px;font-size:13px}#connT{display:none}#card{left:10px;right:10px;width:auto;min-width:0;top:70px;padding:12px}#cover{width:64px;height:64px}#stat{display:none}#bFs{font-size:0;padding:8px 14px;left:12px}#bFs::after{content:"⤢";font-size:20px}#pal{right:12px;gap:8px;padding:8px 10px}#pal button{width:24px;height:24px}#ctl #bPl{width:54px;height:54px}}
 #toast{position:fixed;left:50%;top:14vh;transform:translateX(-50%);background:rgba(0,0,0,.75);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw;text-align:center}
-#pop{position:fixed;right:5vmin;top:22vh;font:400 clamp(28px,7vmin,90px)/1 "Lilita One",Anton,Impact,sans-serif;color:#fff;-webkit-text-stroke:.07em #1a0033;paint-order:stroke fill;text-shadow:0 .06em 0 #1a0033;opacity:0;pointer-events:none}
+#pop{position:fixed;right:5vmin;top:22vh;font:400 clamp(28px,7vmin,90px)/1 "Lilita One",Anton,Impact,sans-serif;color:#fff;-webkit-text-stroke:.07em var(--pani);paint-order:stroke fill;text-shadow:0 .06em 0 var(--pani);opacity:0;pointer-events:none}
 #pop.go{animation:pop 1.4s cubic-bezier(.2,1.6,.3,1) forwards}
 @keyframes pop{0%{opacity:0;transform:scale(.3) rotate(-14deg)}20%{opacity:1;transform:scale(1.15) rotate(-6deg)}70%{opacity:1;transform:scale(1) rotate(-6deg)}100%{opacity:0;transform:scale(1.1) translateY(-4vh) rotate(-6deg)}}
 #cAuto{display:grid;place-items:center}
@@ -85,7 +85,7 @@ input[type=range]{width:100%;accent-color:var(--v)}
 <canvas id="gl"></canvas>
 <canvas id="fx"></canvas>
 <header id="top" class="ui">
-  <div id="logo"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#ff2bd6"/><stop offset="1" stop-color="#1ec8ff"/></linearGradient></defs><g fill="url(#lg)"><rect x="2" y="11" width="3" height="8" rx="1.5"/><rect x="8" y="6" width="3" height="18" rx="1.5"/><rect x="14" y="2" width="3" height="26" rx="1.5"/><rect x="20" y="8" width="3" height="14" rx="1.5"/><rect x="26" y="12" width="3" height="6" rx="1.5"/></g></svg><span>Beat<i>Viz</i></span></div>
+  <div id="logo"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" style="stop-color:var(--a)"/><stop offset="1" style="stop-color:var(--b)"/></linearGradient></defs><g fill="url(#lg)"><rect x="2" y="11" width="3" height="8" rx="1.5"/><rect x="8" y="6" width="3" height="18" rx="1.5"/><rect x="14" y="2" width="3" height="26" rx="1.5"/><rect x="20" y="8" width="3" height="14" rx="1.5"/><rect x="26" y="12" width="3" height="6" rx="1.5"/></g></svg><span>Beat<i>Viz</i></span></div>
   <nav><button class="nv on" data-p="viz">Visualizer</button><button class="nv" data-p="set">Ajustes</button><button class="nv" data-p="about">Acerca de</button></nav>
   <button id="conn"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#1ed760"/><path d="M5.5 9c4-1.2 8-1 12 1M6.3 12.5c3.4-.9 6.6-.7 9.6 1M7 15.8c2.8-.6 5.2-.4 7.6.8" stroke="#05031a" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg><span id="connT">Conectar Spotify</span><i id="dot"></i></button>
 </header>
@@ -143,7 +143,7 @@ function nextShot(){if(!deck.length){deck=[...Array(10).keys()].sort(()=>Math.ra
 function wordTex(txt,c){
  const cn=document.createElement("canvas"),x=cn.getContext("2d"),f="400 200px 'Lilita One',Anton,Impact,sans-serif";x.font=f;
  const w=Math.ceil(x.measureText(txt).width)+120;cn.width=w;cn.height=360;x.font=f;x.textAlign="center";x.textBaseline="middle";
- x.lineJoin="round";x.lineWidth=34;x.strokeStyle="#1a0033";x.shadowColor=rgb(c);x.shadowBlur=45;x.strokeText(txt,w/2,185);x.shadowBlur=0;x.fillStyle="#fff";x.fillText(txt,w/2,185);
+ x.lineJoin="round";x.lineWidth=34;x.strokeStyle=rgb(c.map(v=>Math.round(v*.12+4)));x.shadowColor=rgb(c);x.shadowBlur=45;x.strokeText(txt,w/2,185);x.shadowBlur=0;x.fillStyle="#fff";x.fillText(txt,w/2,185);
  const tex=new THREE.CanvasTexture(cn);tex.minFilter=THREE.LinearFilter;tex.generateMipmaps=false;return{tex,asp:w/360};
 }
 function drop(a){sc.remove(a.m);a.m.geometry.dispose();a.m.material.map.dispose();a.m.material.dispose()}
@@ -302,14 +302,14 @@ function beams(w,h,fy,c1,c2){
 }
 function paintNeon(t,pulse,T){
  const w=bc.width,h=bc.height,c1=T.c[0],c2=T.c[1],fy=h*.7,cx=w*(w/h<.8?.5:.52),H=Math.min(h*.44,w*.62),Lg=I.l*calmF;
- let g=b2.createLinearGradient(0,0,0,h);g.addColorStop(0,"#05031a");g.addColorStop(1,"#0b0630");b2.fillStyle=g;b2.fillRect(0,0,w,h);
+ const mc=mixc(c1,c2),dk=(k,a)=>rgb(mc.map(v=>Math.round(v*k+3)),a);let g=b2.createLinearGradient(0,0,0,h);g.addColorStop(0,dk(.05));g.addColorStop(1,dk(.11));b2.fillStyle=g;b2.fillRect(0,0,w,h);
  if(S.style==="neon"){
   b2.globalCompositeOperation="lighter";
   b2.globalAlpha=Math.min(1,(.45+pulse*.5)*Lg);b2.drawImage(beams(w,h,fy,c1,c2),Math.sin(t*.4)*w*.01,0);b2.globalAlpha=1;
   for(const[fq,c]of[[.2,c1],[.52,mixc(c1,c2)],[.82,c2]]){g=b2.createRadialGradient(w*fq,fy,0,w*fq,fy,w*.28);g.addColorStop(0,rgb(c,.5*Lg));g.addColorStop(1,rgb(c,0));b2.fillStyle=g;b2.fillRect(0,fy-h*.3,w,h*.4)}
   b2.globalCompositeOperation="source-over";
  }
- g=b2.createLinearGradient(0,fy,0,h);g.addColorStop(0,"rgba(22,8,64,.96)");g.addColorStop(1,"rgba(4,2,20,1)");b2.fillStyle=g;b2.fillRect(0,fy,w,h-fy);
+ g=b2.createLinearGradient(0,fy,0,h);g.addColorStop(0,dk(.17,.96));g.addColorStop(1,dk(.03));b2.fillStyle=g;b2.fillRect(0,fy,w,h-fy);
  const rg=b2.createLinearGradient(cx-H*.7,0,cx+H*.7,0);rg.addColorStop(0,rgb(c1));rg.addColorStop(1,rgb(c2));
  b2.save();b2.strokeStyle=rg;b2.lineWidth=Math.max(2,h*.005);b2.shadowColor=rgb(c1);b2.shadowBlur=h*.03*(.5+Lg);b2.beginPath();b2.ellipse(cx,fy+h*.015,H*.66*(1+pulse*.03),H*.075,0,0,7);b2.stroke();b2.restore();
  const al=I.sil;
@@ -492,6 +492,7 @@ function save(){localStorage.setItem("bvs",JSON.stringify(S));syncI()}syncI();
 function applyPal(T){
  T.c0=T.c0||T.c;T.c=S.pal==="auto"?T.c0:S.pal==="custom"&&S.custom?S.custom:(PALS[+S.pal]||PALS[0]).c;
  const r=document.documentElement.style;r.setProperty("--a",rgb(T.c[0]));r.setProperty("--b",rgb(T.c[1]));
+ const mv=mixc(T.c[0],T.c[1]);r.setProperty("--v",rgb(mv));r.setProperty("--bd",rgb(mv,.3));r.setProperty("--pan",rgb(mv.map(v=>Math.round(v*.07+6)),.74));r.setProperty("--pani",rgb(mv.map(v=>Math.round(v*.1+8))));
  post.uniforms.fc.value=col(T.c[0]);post.uniforms.fd.value=col(T.c[1]);const ca=$("#cAuto");if(ca)ca.style.background=`linear-gradient(135deg,${rgb(T.c0[0])},${rgb(T.c0[1])})`;T.dc=[0,90,180,270].map(k=>hsl((hue(T.c[0])+k)%360,.95,.58));
 }
 $("#pal").innerHTML='<button data-pal="auto" id="cAuto" aria-label="Colores de la canción" title="Colores de la canción"></button>'+PALS.map((p,i)=>`<button data-pal="${i}" aria-label="Paleta ${i+1}" style="background:linear-gradient(135deg,${rgb(p.c[0])},${rgb(p.c[1])})"></button>`).join("")+`<button id="bAddC" aria-label="Color personalizado">+</button>`;
